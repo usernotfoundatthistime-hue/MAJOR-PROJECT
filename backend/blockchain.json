@@ -1,0 +1,219 @@
+[
+    {
+        "index": 0,
+        "timestamp": "2026-02-19 16:08:36.923275",
+        "event_type": "GENESIS_BLOCK",
+        "data": "Initial Block",
+        "previous_hash": "0",
+        "hash": "ae4d6a25b7abfd59e39d0bfb700ea36df5c2d41c1022f4fdc71996c914cadc10"
+    },
+    {
+        "index": 1,
+        "timestamp": "2026-02-19 16:09:47.898841",
+        "event_type": "SPAM_DECTECTED",
+        "data": {
+            "username": "Vishal",
+            "message": "Buy now at cheap price just 100"
+        },
+        "previous_hash": "ae4d6a25b7abfd59e39d0bfb700ea36df5c2d41c1022f4fdc71996c914cadc10",
+        "hash": "fda5f4d2de19565f365520661dcebaa6e2a5f2019e84c522b353c53813a900de"
+    },
+    {
+        "index": 2,
+        "timestamp": "2026-02-19 16:10:42.469123",
+        "event_type": "PHISHING_ATTEMPT",
+        "data": {
+            "username": "Vishal",
+            "message": "http://verify-account.tk"
+        },
+        "previous_hash": "fda5f4d2de19565f365520661dcebaa6e2a5f2019e84c522b353c53813a900de",
+        "hash": "64d24bbb606418b14fd67af1fb1a28a830999b4f5db561b0fec9e77408c9f459"
+    },
+    {
+        "index": 3,
+        "timestamp": "2026-02-19 21:27:51.390117",
+        "event_type": "PHISHING_ATTEMPT",
+        "data": {
+            "username": "Vishal",
+            "message": "https://secure-update.xyz"
+        },
+        "previous_hash": "64d24bbb606418b14fd67af1fb1a28a830999b4f5db561b0fec9e77408c9f459",
+        "hash": "0ee328f419600ef5dd5cbcc4dbe6bd4c7e4ce67f00bca5ce4bdb73c1bfe3bbfa"
+    },
+    {
+        "index": 4,
+        "timestamp": "2026-03-07 11:34:33.438111",
+        "event_type": "PHISHING_ATTEMPT",
+        "data": {
+            "username": "Navadeep",
+            "message": "Buy now! Limited time offer \ud83d\udd25   Get 90% discount on electronics   http://cheap-deals.xyz"
+        },
+        "previous_hash": "0ee328f419600ef5dd5cbcc4dbe6bd4c7e4ce67f00bca5ce4bdb73c1bfe3bbfa",
+        "hash": "512e26783201b1c2e256f401827654b090bf6930b5944d06d9f021983f325670"
+    },
+    {
+        "index": 5,
+        "timestamp": "2026-03-07 11:34:41.583770",
+        "event_type": "PHISHING_ATTEMPT",
+        "data": {
+            "username": "Navadeep",
+            "message": "Buy now! Limited time offer \ud83d\udd25   Get 90% discount on electronics   http://cheap-deals.xyz"
+        },
+        "previous_hash": "512e26783201b1c2e256f401827654b090bf6930b5944d06d9f021983f325670",
+        "hash": "55093a1f2af3b39b2cbb042ca649436346fa33b358ff9f42c7b48851fb77bb59"
+    },
+    {
+        "index": 6,
+        "timestamp": "2026-03-07 11:35:43.234005",
+        "event_type": "PHISHING_ATTEMPT",
+        "data": {
+            "username": "Navadeep",
+            "message": "URGENT: Verify your bank account immediately   http://secure-login.tk"
+        },
+        "previous_hash": "55093a1f2af3b39b2cbb042ca649436346fa33b358ff9f42c7b48851fb77bb59",
+        "hash": "2e8f71a5d4c5beb16cf6fe6407d2bfb889b3a8da0f972d594bd87d20e311197f"
+    },
+    {
+        "index": 7,
+        "timestamp": "2026-03-07 11:36:00.144299",
+        "event_type": "PHISHING_ATTEMPT",
+        "data": {
+            "username": "Navadeep",
+            "message": "FREE giveaway today!   Click here to claim your reward   http://gift-offer.tk"
+        },
+        "previous_hash": "2e8f71a5d4c5beb16cf6fe6407d2bfb889b3a8da0f972d594bd87d20e311197f",
+        "hash": "1f64715238a7d29396b251d541d1a6b74df266db0870f037bec47dfa1405db29"
+    },
+    {
+        "index": 8,
+        "timestamp": "2026-03-07 11:36:46.353041",
+        "event_type": "PHISHING_ATTEMPT",
+        "data": {
+            "username": "Navadeep",
+            "message": "Buy now this limitted offer http://super-sale.xyz"
+        },
+        "previous_hash": "1f64715238a7d29396b251d541d1a6b74df266db0870f037bec47dfa1405db29",
+        "hash": "4bfe85b6310c3ed14681b3cbbfcd1b1c9fcfa3573f80848423a7716ce96e33ad"
+    },
+    {
+        "index": 9,
+        "timestamp": "2026-03-07 11:36:54.085403",
+        "event_type": "SPAM_DETECTED",
+        "data": {
+            "username": "Navadeep",
+            "message": "Buy now this limitted offer"
+        },
+        "previous_hash": "4bfe85b6310c3ed14681b3cbbfcd1b1c9fcfa3573f80848423a7716ce96e33ad",
+        "hash": "4ea43ac3188a153a50ceb2b7a14e1c0ea3b72c922d691a651c11571279694f37"
+    },
+    {
+        "index": 10,
+        "timestamp": "2026-03-07 11:37:17.598620",
+        "event_type": "PHISHING_ATTEMPT",
+        "data": {
+            "username": "Navadeep",
+            "message": "Special promotion just for you!   Buy now before stock ends   http://super-sale.xyz"
+        },
+        "previous_hash": "4ea43ac3188a153a50ceb2b7a14e1c0ea3b72c922d691a651c11571279694f37",
+        "hash": "e0d9e65be6f402ed8fa162ca2ab255aa9d5905cd38d7eae660d7c3e38d1482d5"
+    },
+    {
+        "index": 11,
+        "timestamp": "2026-03-07 12:04:14.287379",
+        "event_type": "PHISHING_ATTEMPT",
+        "data": {
+            "username": "Navadeep",
+            "message": "Buy now! Limited time offer   http://cheap-deals.xyz"
+        },
+        "previous_hash": "e0d9e65be6f402ed8fa162ca2ab255aa9d5905cd38d7eae660d7c3e38d1482d5",
+        "hash": "46409d1d3772361c005db97203bee06d2710002ce5c4a0ad57fcbf7e13b31257"
+    },
+    {
+        "index": 12,
+        "timestamp": "2026-03-07 12:05:57.776252",
+        "event_type": "SPAM_DETECTED",
+        "data": {
+            "username": "Navadeep",
+            "message": "Buy now! Limited time offer http://cheapdeals.com"
+        },
+        "previous_hash": "46409d1d3772361c005db97203bee06d2710002ce5c4a0ad57fcbf7e13b31257",
+        "hash": "31e69492d3f0fd80dc8d122816b96db6ea96c831a2af77aa339415ffccf4ceeb"
+    },
+    {
+        "index": 13,
+        "timestamp": "2026-03-07 12:06:09.877413",
+        "event_type": "SPAM_DETECTED",
+        "data": {
+            "username": "Navadeep",
+            "message": "Buy now! Limited time offer http://cheapdeals.com"
+        },
+        "previous_hash": "31e69492d3f0fd80dc8d122816b96db6ea96c831a2af77aa339415ffccf4ceeb",
+        "hash": "9f94a8280bdf7cf9735cce8958b1bd47e3acb483e1a39f8defc727d2d0e519f0"
+    },
+    {
+        "index": 14,
+        "timestamp": "2026-03-07 12:06:35.138671",
+        "event_type": "PHISHING_ATTEMPT",
+        "data": {
+            "username": "Navadeep",
+            "message": "Verify your account immediately http://verify-account.tk"
+        },
+        "previous_hash": "9f94a8280bdf7cf9735cce8958b1bd47e3acb483e1a39f8defc727d2d0e519f0",
+        "hash": "fa325c4bf1e88347b03386de308c1a1d73ef14f3f8dcf5074603e7842f7d9a0e"
+    },
+    {
+        "index": 15,
+        "timestamp": "2026-03-07 12:22:11.235217",
+        "event_type": "SPAM_DETECTED",
+        "data": {
+            "username": "Vishal",
+            "message": "Limited time sale buy now http://discountstore.com"
+        },
+        "previous_hash": "fa325c4bf1e88347b03386de308c1a1d73ef14f3f8dcf5074603e7842f7d9a0e",
+        "hash": "61f8d71d4be893b19c28426091e13c19543de8a0b725a22618bad538553824ca"
+    },
+    {
+        "index": 16,
+        "timestamp": "2026-03-07 12:22:30.176193",
+        "event_type": "PHISHING_ATTEMPT",
+        "data": {
+            "username": "Vishal",
+            "message": "Update your SBI CREDIT CARD by visiting SBI Webpage http://secure-login.tk"
+        },
+        "previous_hash": "61f8d71d4be893b19c28426091e13c19543de8a0b725a22618bad538553824ca",
+        "hash": "989cf812f080c631b64f611d686859125ac9c455cbf7a6da53b6ac1f19cbef47"
+    },
+    {
+        "index": 17,
+        "timestamp": "2026-03-08 17:34:31.995876",
+        "event_type": "PHISHING_ATTEMPT",
+        "data": {
+            "username": "Navadeep",
+            "message": "Verify you account https://verify-account.tk"
+        },
+        "previous_hash": "989cf812f080c631b64f611d686859125ac9c455cbf7a6da53b6ac1f19cbef47",
+        "hash": "85a669ee5257606708266aff2a924bbb8919204ed23affc6cc0d84645abf1ff6"
+    },
+    {
+        "index": 18,
+        "timestamp": "2026-03-09 19:52:43.755036",
+        "event_type": "Spam",
+        "data": {
+            "username": "Navadeep",
+            "message": "URGENT! You have been selected to win a FREE $1000 gift card. Text WINNER to 555-0199 now to claim your prize!"
+        },
+        "previous_hash": "85a669ee5257606708266aff2a924bbb8919204ed23affc6cc0d84645abf1ff6",
+        "hash": "1fd32c0d073074c224a82c17d553d4d9c3e1f3935d46e574e6213a09444936a0"
+    },
+    {
+        "index": 19,
+        "timestamp": "2026-03-09 19:52:55.355174",
+        "event_type": "Phishing",
+        "data": {
+            "username": "Navadeep",
+            "message": "Your account has been suspended due to suspicious activity. Please verify your login details immediately at http://secure-login.ru/update"
+        },
+        "previous_hash": "1fd32c0d073074c224a82c17d553d4d9c3e1f3935d46e574e6213a09444936a0",
+        "hash": "c3e34e03d05764ce77680e03be9d762cf9f195624cb346751d72d4b2c31816e7"
+    }
+]
