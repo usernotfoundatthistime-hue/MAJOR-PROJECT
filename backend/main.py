@@ -5,6 +5,7 @@ from typing import List
 import sqlite3
 import re
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import joblib
 import json
 import os
@@ -197,8 +198,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
 @app.post("/send_message")
 async def send_message(message: Message):
     spam_flag = 0
-    display_time = datetime.now().strftime("%I:%M %p") 
-    
+    # display_time = datetime.now().strftime("%I:%M %p") 
+    display_time = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%I:%M %p")
     # Tell the AI to scan the plain text, not the encrypted text
     text_to_scan = message.scan_text if message.scan_text else message.text
 

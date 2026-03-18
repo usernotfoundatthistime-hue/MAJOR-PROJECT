@@ -6,9 +6,14 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:shared_preferences/shared_preferences.dart';
 
-const String serverIp = "192.168.1.127";
-const String httpBase = "http://$serverIp:8000";
-const String wsBase = "ws://$serverIp:8000";
+//----------Local connection test----------
+//const String serverIp = "192.168.1.127";
+//const String httpBase = "http://$serverIp:8000";
+//const String wsBase = "ws://$serverIp:8000";
+
+//----------Render server----------
+const String httpBase = "https://safechat-api.onrender.com";
+const String wsBase = "wss://safechat-api.onrender.com";
 
 void main() async {
   // Ensure Flutter is ready before checking memory
