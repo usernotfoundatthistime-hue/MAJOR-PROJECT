@@ -5,6 +5,12 @@ import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async'; // REQUIRED FOR THE TIMER
+import 'dart:ui'; // <--- REQUIRED FOR THE BLUR EFFECT
+
+// This allows us to navigate from anywhere in the app
+final GlobalKey<NavigatorState> globalNavigatorKey =
+    GlobalKey<NavigatorState>();
 
 //----------Local connection test----------
 //const String serverIp = "192.168.1.127";
@@ -26,26 +32,89 @@ void main() async {
   runApp(MyApp(savedUser: savedUser));
 }
 
+class InactivityWrapper extends StatefulWidget {
+  final Widget child;
+  const InactivityWrapper({super.key, required this.child});
+
+  @override
+  State<InactivityWrapper> createState() => _InactivityWrapperState();
+}
+
+class _InactivityWrapperState extends State<InactivityWrapper> {
+  Timer? _timer;
+  bool _isLocked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    // SET TO 10 SECONDS FOR YOUR DEMO (Change to minutes: 15 for production)
+    _timer = Timer(const Duration(seconds: 30), _lockApp);
+  }
+
+  void _userInteracted() {
+    if (!_isLocked) {
+      _startTimer();
+    }
+  }
+
+  void _lockApp() {
+    if (!_isLocked) {
+      setState(() => _isLocked = true);
+      globalNavigatorKey.currentState?.push(
+        // MAGIC FIX: PageRouteBuilder allows us to make the new screen transparent!
+        PageRouteBuilder(
+          opaque: false, // <--- This lets the chat show through
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              PinLockScreen(
+                onUnlock: () {
+                  setState(() => _isLocked = false);
+                  _startTimer();
+                },
+              ),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: _userInteracted,
+      onPanDown: (_) => _userInteracted(),
+      child: widget.child,
+    );
+  }
+}
+
 class MyApp extends StatelessWidget {
   final String? savedUser; // Accept the saved user
   const MyApp({super.key, this.savedUser});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'SAFE Chat',
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF0F172A),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF1E293B),
-          elevation: 0,
+    return InactivityWrapper(
+      // <--- WRAPS THE WHOLE APP
+      child: MaterialApp(
+        navigatorKey: globalNavigatorKey, // <--- ADDS THE GLOBAL KEY
+        debugShowCheckedModeBanner: false,
+        title: 'SAFE Chat',
+        theme: ThemeData.dark().copyWith(
+          scaffoldBackgroundColor: const Color(0xFF0F172A),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Color(0xFF1E293B),
+            elevation: 0,
+          ),
         ),
+        home: savedUser != null
+            ? ChatListScreen(currentUser: savedUser!)
+            : const LoginScreen(),
       ),
-      // If a user exists, go straight to chats. If not, show Login!
-      home: savedUser != null
-          ? ChatListScreen(currentUser: savedUser!)
-          : const LoginScreen(),
     );
   }
 }
@@ -85,7 +154,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   Future<void> fetchLastMessage(String otherUser) async {
     final response = await http.get(
-      Uri.parse("$httpBase/messages/${widget.currentUser}/$otherUser"),
+      Uri.parse(
+        "$httpBase/messages/${widget.currentUser}/${Uri.encodeComponent(otherUser)}",
+      ),
     );
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);
@@ -200,6 +271,84 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
+  void _showCreateGroupDialog() {
+    final controller = TextEditingController();
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1E293B),
+            title: const Text("Create Group Chat"),
+            content: TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                hintText: "Group Name (e.g., ProjectTeam)",
+                hintStyle: TextStyle(color: Colors.white38),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  "Cancel",
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: isLoading
+                    ? null
+                    : () async {
+                        if (controller.text.trim().isEmpty) return;
+                        setState(() => isLoading = true);
+
+                        // Remove spaces for clean hashtags
+                        String safeGroupName = controller.text
+                            .trim()
+                            .replaceAll(" ", "");
+
+                        final response = await http.post(
+                          Uri.parse("$httpBase/create_group"),
+                          headers: {"Content-Type": "application/json"},
+                          body: jsonEncode({
+                            "group_name": safeGroupName,
+                            "creator": widget.currentUser,
+                          }),
+                        );
+
+                        if (response.statusCode == 200) {
+                          fetchUsers(); // Refresh the chat list instantly
+                          if (mounted) Navigator.pop(ctx);
+                        } else {
+                          setState(() => isLoading = false);
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                ),
+                child: isLoading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        "Create",
+                        style: TextStyle(color: Colors.white),
+                      ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -212,14 +361,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
           IconButton(
             icon: const Icon(Icons.security, color: Colors.greenAccent),
             tooltip: "View Blockchain Ledger",
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const BlockchainLedgerScreen(),
-                ),
-              );
-            },
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const BlockchainLedgerScreen(),
+              ),
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.account_circle, color: Colors.white70),
@@ -233,7 +380,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.person_add_alt_1),
+            icon: const Icon(
+              Icons.group_add,
+              color: Colors.blueAccent,
+            ), // Create Group
+            tooltip: "Create Group",
+            onPressed: _showCreateGroupDialog,
+          ),
+          IconButton(
+            icon: const Icon(Icons.person_add_alt_1), // Add Friend
+            tooltip: "Add Friend",
             onPressed: _showAddContactDialog,
           ),
           IconButton(
@@ -340,7 +496,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           otherUser: name,
                         ),
                       ),
-                    ),
+                    ).then((_) => fetchUsers()),
                   ),
                 );
               },
@@ -401,8 +557,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
     channel.stream.listen((data) {
       final newMessage = jsonDecode(data);
-      if (newMessage['sender'] == widget.otherUser ||
-          newMessage['sender'] == "SYSTEM") {
+
+      // MAGIC FIX: Accept the message if it's 1-on-1 OR if the group_name matches the current window!
+      bool isForThisChat =
+          newMessage['sender'] == widget.otherUser ||
+          newMessage['sender'] == "SYSTEM" ||
+          newMessage['group_name'] == widget.otherUser;
+
+      if (isForThisChat) {
         if (mounted) {
           setState(() {
             messages.insert(0, {
@@ -411,6 +573,7 @@ class _ChatScreenState extends State<ChatScreen> {
               "isSystem": newMessage['sender'] == "SYSTEM",
               "isSpam": newMessage['spam'] ?? false,
               "time": newMessage['timestamp'],
+              "senderName": newMessage['sender'], // Track who sent it
             });
           });
         }
@@ -427,7 +590,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> fetchMessages() async {
     final response = await http.get(
-      Uri.parse("$httpBase/messages/${widget.currentUser}/${widget.otherUser}"),
+      Uri.parse(
+        "$httpBase/messages/${widget.currentUser}/${Uri.encodeComponent(widget.otherUser)}",
+      ),
     );
     if (response.statusCode == 200 && mounted) {
       final List data = jsonDecode(response.body);
@@ -440,12 +605,169 @@ class _ChatScreenState extends State<ChatScreen> {
                 "isSystem": msg["sender"] == "SYSTEM",
                 "isSpam": msg["spam"] ?? false,
                 "time": msg["timestamp"],
+                "senderName": msg["sender"], // Track who sent it
               },
             )
             .toList()
             .reversed
             .toList();
       });
+    }
+  }
+
+  void _showAddMemberDialog() {
+    final controller = TextEditingController();
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1E293B),
+            title: Text("Add Member to ${widget.otherUser}"),
+            content: TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                hintText: "Enter exact Username",
+                hintStyle: TextStyle(color: Colors.white38),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  "Cancel",
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: isLoading
+                    ? null
+                    : () async {
+                        if (controller.text.trim().isEmpty) return;
+                        setState(() => isLoading = true);
+
+                        final response = await http.post(
+                          Uri.parse("$httpBase/add_to_group"),
+                          headers: {"Content-Type": "application/json"},
+                          body: jsonEncode({
+                            "group_name":
+                                widget.otherUser, // e.g., "#ProjectTeam"
+                            "contact": controller.text.trim(),
+                          }),
+                        );
+
+                        if (response.statusCode == 200) {
+                          if (mounted) {
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Member successfully added!"),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        } else {
+                          setState(() => isLoading = false);
+                          final error = jsonDecode(response.body)["detail"];
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(error),
+                              backgroundColor: Colors.redAccent,
+                            ),
+                          );
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                ),
+                child: isLoading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text("Add", style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showGroupInfoDialog() async {
+    final response = await http.get(
+      Uri.parse(
+        "$httpBase/group_members/${Uri.encodeComponent(widget.otherUser)}",
+      ),
+    );
+    if (response.statusCode == 200) {
+      List members = jsonDecode(response.body);
+
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF1E293B),
+          title: Text("${widget.otherUser} Members"),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: members.length,
+              itemBuilder: (context, index) {
+                return ListTile(
+                  leading: const Icon(Icons.person, color: Colors.blueAccent),
+                  title: Text(members[index]),
+                  trailing: members[index] == widget.currentUser
+                      ? const Text(
+                          "(You)",
+                          style: TextStyle(color: Colors.green),
+                        )
+                      : null,
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text(
+                "Close",
+                style: TextStyle(color: Colors.white70),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+              ),
+              onPressed: () async {
+                // Exit Group API Call
+                await http.post(
+                  Uri.parse("$httpBase/exit_group"),
+                  headers: {"Content-Type": "application/json"},
+                  body: jsonEncode({
+                    "group_name": widget.otherUser,
+                    "username": widget.currentUser,
+                  }),
+                );
+                if (!mounted) return;
+                Navigator.pop(ctx); // Close Dialog
+                Navigator.pop(context); // Exit Chat Screen back to Home
+              },
+              child: const Text(
+                "Exit Group",
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      );
     }
   }
 
@@ -516,7 +838,25 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.otherUser)),
+      appBar: AppBar(
+        title: Text(widget.otherUser),
+        actions: [
+          // Magic Check: If the chat name starts with '#', it's a group!
+          if (widget.otherUser.startsWith("#")) ...[
+            IconButton(
+              icon: const Icon(Icons.person_add, color: Colors.blueAccent),
+              tooltip: "Add Member",
+              onPressed: _showAddMemberDialog,
+            ),
+            // THIS IS THE NEW INFO BUTTON
+            IconButton(
+              icon: const Icon(Icons.info_outline, color: Colors.white70),
+              tooltip: "Group Info",
+              onPressed: _showGroupInfoDialog,
+            ),
+          ],
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
@@ -539,6 +879,22 @@ class _ChatScreenState extends State<ChatScreen> {
                         ? CrossAxisAlignment.end
                         : CrossAxisAlignment.start,
                     children: [
+                      // THIS IS THE NEW SENDER NAME TEXT
+                      if (widget.otherUser.startsWith("#") &&
+                          !msg["isMe"] &&
+                          !msg["isSystem"])
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4, bottom: 2),
+                          child: Text(
+                            msg["senderName"] ?? "Unknown",
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.blueAccent,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+
                       Container(
                         margin: const EdgeInsets.symmetric(vertical: 4),
                         padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
@@ -630,10 +986,7 @@ class BlockchainLedgerScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          "Security Ledger (Blockchain)",
-          style: TextStyle(fontSize: 18),
-        ),
+        title: const Text("Security Ledger", style: TextStyle(fontSize: 18)),
         backgroundColor: const Color(0xFF1E293B),
       ),
       body: FutureBuilder<List<dynamic>>(
@@ -643,116 +996,138 @@ class BlockchainLedgerScreen extends StatelessWidget {
             return const Center(
               child: CircularProgressIndicator(color: Colors.blueAccent),
             );
-          } else if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                "Error: ${snapshot.error}",
-                style: const TextStyle(color: Colors.red),
-              ),
-            );
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return const Center(child: Text("Ledger is empty."));
           }
 
-          final chain = snapshot.data!;
+          // Reverse the chain so the newest block loads at the bottom
+          final chain = snapshot.data!.reversed.toList();
+
           return ListView.builder(
+            reverse: true, // Auto-scrolls to the newest block!
             padding: const EdgeInsets.all(16),
             itemCount: chain.length,
             itemBuilder: (context, index) {
               final block = chain[index];
-              return Container(
+
+              // Determine Threat Type and Colors from your Python backend
+              String eventType = block['event_type'] ?? "UNKNOWN";
+              bool isPhishing = eventType.toUpperCase() == "PHISHING";
+              bool isSpam = eventType.toUpperCase() == "SPAM";
+              bool isGenesis = eventType.toUpperCase() == "GENESIS_BLOCK";
+
+              Color badgeColor = isPhishing
+                  ? Colors.redAccent
+                  : (isSpam ? Colors.orangeAccent : Colors.greenAccent);
+              String icon = isPhishing ? "🎣" : (isSpam ? "🗑️" : "✅");
+              String label = isPhishing
+                  ? "PHISHING ATTEMPT"
+                  : (isSpam ? "SPAM DETECTED" : "SYSTEM EVENT");
+
+              Map<String, dynamic> dataPayload = {};
+              try {
+                dataPayload = block['data'] is String
+                    ? jsonDecode(block['data'])
+                    : block['data'];
+              } catch (e) {}
+
+              return Card(
                 margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
+                color: const Color(0xFF1E293B),
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          "Block #${block['index'] ?? index}",
-                          style: const TextStyle(
-                            color: Colors.blueAccent,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "🧱 Block #${block['index']}",
+                            style: const TextStyle(
+                              color: Colors.blueAccent,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
+                          Text(
+                            block['timestamp'].toString().split('.')[0],
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // The beautiful warning badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
                         ),
-                        Text(
-                          block['timestamp'] ?? "Unknown Time",
-                          style: const TextStyle(
-                            color: Colors.white54,
+                        decoration: BoxDecoration(
+                          color: badgeColor.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: badgeColor),
+                        ),
+                        child: Text(
+                          "$icon $label",
+                          style: TextStyle(
+                            color: badgeColor,
+                            fontWeight: FontWeight.bold,
                             fontSize: 12,
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // The intercepted data
+                      if (!isGenesis && dataPayload.isNotEmpty) ...[
+                        Text(
+                          "User: ${dataPayload['username'] ?? 'Unknown'}",
+                          style: const TextStyle(color: Colors.white70),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          "\"${dataPayload['message'] ?? ''}\"",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ] else ...[
+                        const Text(
+                          "System Initialization",
+                          style: TextStyle(color: Colors.white70),
+                        ),
                       ],
-                    ),
-                    const Divider(color: Colors.white24, height: 24),
-                    const Text(
-                      "HASH:",
-                      style: TextStyle(
-                        color: Colors.white54,
-                        fontSize: 10,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                    Text(
-                      block['hash'] ?? "N/A",
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        color: Colors.greenAccent,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      "PREVIOUS HASH:",
-                      style: TextStyle(
-                        color: Colors.white54,
-                        fontSize: 10,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                    Text(
-                      block['previous_hash'] ?? "N/A",
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        color: Colors.white70,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      "DATA:",
-                      style: TextStyle(
-                        color: Colors.white54,
-                        fontSize: 10,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.black26,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        block['data'] != null
-                            ? jsonEncode(block['data'])
-                            : "Genesis Block",
+
+                      const Divider(color: Colors.white24, height: 24),
+
+                      // Muted Hashes (Keeps professors happy, keeps UI clean!)
+                      Text(
+                        "Hash: ${block['hash']}",
                         style: const TextStyle(
+                          color: Colors.white24,
+                          fontSize: 10,
                           fontFamily: 'monospace',
-                          color: Colors.orangeAccent,
-                          fontSize: 12,
                         ),
                       ),
-                    ),
-                  ],
+                      Text(
+                        "Prev: ${block['previous_hash']}",
+                        style: const TextStyle(
+                          color: Colors.white24,
+                          fontSize: 10,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               );
             },
@@ -857,6 +1232,306 @@ class ProfileScreen extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class PinLockScreen extends StatefulWidget {
+  final VoidCallback onUnlock;
+  const PinLockScreen({super.key, required this.onUnlock});
+
+  @override
+  State<PinLockScreen> createState() => _PinLockScreenState();
+}
+
+class _PinLockScreenState extends State<PinLockScreen> {
+  final TextEditingController _pinController = TextEditingController();
+  String _errorMessage = "";
+  bool _isLoading = false;
+
+  void _verifyPin() async {
+    if (_pinController.text.length != 4) {
+      setState(() => _errorMessage = "Please enter all 4 digits.");
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    final prefs = await SharedPreferences.getInstance();
+    final currentUser = prefs.getString('loggedInUser');
+    final savedPin = prefs.getString('mpin_$currentUser') ?? "1234";
+
+    if (_pinController.text == savedPin) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      widget.onUnlock();
+    } else {
+      setState(() {
+        _errorMessage = "Incorrect PIN. Session locked.";
+        _pinController.clear();
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: Colors.black.withOpacity(
+          0.5,
+        ), // Semi-transparent black
+        body: BackdropFilter(
+          filter: ImageFilter.blur(
+            sigmaX: 10.0,
+            sigmaY: 10.0,
+          ), // The heavy blur effect!
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.lock_clock,
+                    size: 80,
+                    color: Colors.redAccent,
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    "SESSION TIMEOUT",
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "For your security, SAFE Chat has been locked due to inactivity. Enter your MPIN to resume.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  const SizedBox(height: 40),
+
+                  TextField(
+                    controller: _pinController,
+                    obscureText: true,
+                    keyboardType: TextInputType.number,
+                    maxLength: 4,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      letterSpacing: 16,
+                      color: Colors.blueAccent,
+                    ),
+                    decoration: InputDecoration(
+                      counterText: "",
+                      filled: true,
+                      fillColor: Colors.black.withOpacity(0.5),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.white10),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.blueAccent),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  Text(
+                    _errorMessage,
+                    style: const TextStyle(
+                      color: Colors.redAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // The explicit UNLOCK button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _verifyPin,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blueAccent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: _isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                              "UNLOCK",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class MpinSetupScreen extends StatefulWidget {
+  final String username;
+  const MpinSetupScreen({super.key, required this.username});
+
+  @override
+  State<MpinSetupScreen> createState() => _MpinSetupScreenState();
+}
+
+class _MpinSetupScreenState extends State<MpinSetupScreen> {
+  final TextEditingController _pinController = TextEditingController();
+  final TextEditingController _confirmController = TextEditingController();
+  String _errorMessage = "";
+  bool _isLoading = false;
+
+  void _savePin() async {
+    if (_pinController.text.length != 4 ||
+        _confirmController.text.length != 4) {
+      setState(() => _errorMessage = "PIN must be exactly 4 digits.");
+      return;
+    }
+
+    if (_pinController.text != _confirmController.text) {
+      setState(() {
+        _errorMessage = "PINs do not match. Try again.";
+        _confirmController.clear();
+      });
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('mpin_${widget.username}', _pinController.text);
+
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatListScreen(currentUser: widget.username),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F172A),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.security, size: 80, color: Colors.greenAccent),
+              const SizedBox(height: 24),
+              const Text(
+                "SETUP SECURE MPIN",
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                "Create a 4-digit PIN to secure your active sessions.",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white54),
+              ),
+              const SizedBox(height: 40),
+
+              _buildPinField(_pinController, "Enter 4-Digit PIN"),
+              const SizedBox(height: 16),
+              _buildPinField(_confirmController, "Confirm 4-Digit PIN"),
+
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage,
+                style: const TextStyle(
+                  color: Colors.redAccent,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _savePin,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.greenAccent,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.black)
+                      : const Text(
+                          "SAVE MPIN",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPinField(TextEditingController controller, String hint) {
+    return TextField(
+      controller: controller,
+      obscureText: true,
+      keyboardType: TextInputType.number,
+      maxLength: 4,
+      textAlign: TextAlign.center,
+      style: const TextStyle(
+        fontSize: 24,
+        letterSpacing: 16,
+        color: Colors.white,
+      ),
+      decoration: InputDecoration(
+        counterText: "",
+        hintText: hint,
+        hintStyle: const TextStyle(
+          fontSize: 14,
+          letterSpacing: 1,
+          color: Colors.white38,
+        ),
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.05),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.white10),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.greenAccent),
+        ),
       ),
     );
   }

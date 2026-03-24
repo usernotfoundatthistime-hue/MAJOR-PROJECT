@@ -215,5 +215,16 @@
         },
         "previous_hash": "1fd32c0d073074c224a82c17d553d4d9c3e1f3935d46e574e6213a09444936a0",
         "hash": "c3e34e03d05764ce77680e03be9d762cf9f195624cb346751d72d4b2c31816e7"
+    },
+    {
+        "index": 20,
+        "timestamp": "2026-03-22 12:29:02.900392",
+        "event_type": "Phishing",
+        "data": {
+            "username": "Vishal",
+            "message": "Click here for free money: http://scam.ru"
+        },
+        "previous_hash": "c3e34e03d05764ce77680e03be9d762cf9f195624cb346751d72d4b2c31816e7",
+        "hash": "07994505a68b1ccb4e8decd0392142dd34018314d3a41b162274ee4012e6b7a1"
     }
 ]

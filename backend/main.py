@@ -60,6 +60,18 @@ def create_tables():
         UNIQUE(owner, contact)
     )
     """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS groups (
+        group_name TEXT UNIQUE
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS group_members (
+        group_name TEXT,
+        username TEXT,
+        UNIQUE(group_name, username)
+    )
+    """)
     conn.commit()
     conn.close()
 
@@ -236,12 +248,34 @@ async def send_message(message: Message):
     conn.close()
 
     # 4. Push via WebSocket (Pushes the ENCRYPTED text to receiver)
-    await manager.send_message({
-        "sender": message.sender,
-        "text": message.text,
-        "timestamp": display_time,
-        "spam": bool(spam_flag)
-    }, message.receiver)
+    if message.receiver.startswith("#"):
+        # IT IS A GROUP CHAT! Fetch all members of this group
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT username FROM group_members WHERE group_name=?", (message.receiver,))
+        members = cursor.fetchall()
+        conn.close()
+
+        # Broadcast to every member currently online
+        for member in members:
+            member_name = member["username"]
+            # Don't echo the message back to the person who just sent it
+            if member_name != message.sender:
+                await manager.send_message({
+                    "sender": message.sender, # Shows WHO in the group sent it
+                    "text": message.text,
+                    "timestamp": display_time,
+                    "spam": bool(spam_flag),
+                    "group_name": message.receiver # Tells the frontend which chat this belongs to
+                }, member_name)
+    else:
+        # NORMAL 1-ON-1 CHAT
+        await manager.send_message({
+            "sender": message.sender,
+            "text": message.text,
+            "timestamp": display_time,
+            "spam": bool(spam_flag)
+        }, message.receiver)
 
     response = {"message": "Message sent", "timestamp": display_time}
     if spam_flag:
@@ -253,12 +287,24 @@ async def send_message(message: Message):
 def get_messages(user1: str, user2: str):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT sender, receiver, text, timestamp, spam
-        FROM messages
-        WHERE (sender=? AND receiver=?) OR (sender=? AND receiver=?)
-        ORDER BY id ASC
-    """, (user1, user2, user2, user1))
+    
+    # MAGIC FIX: If user2 starts with #, it's a group chat! Just grab everything sent to this group.
+    if user2.startswith("#"):
+        cursor.execute("""
+            SELECT sender, receiver, text, timestamp, spam
+            FROM messages
+            WHERE receiver=?
+            ORDER BY id ASC
+        """, (user2,))
+    else:
+        # Normal 1-on-1 chat logic
+        cursor.execute("""
+            SELECT sender, receiver, text, timestamp, spam
+            FROM messages
+            WHERE (sender=? AND receiver=?) OR (sender=? AND receiver=?)
+            ORDER BY id ASC
+        """, (user1, user2, user2, user1))
+        
     rows = cursor.fetchall()
     conn.close()
 
@@ -292,3 +338,70 @@ def get_profile(username: str):
         "status": "Verified on Blockchain",
         "clearance": "Level 1 (Standard User)"
     }
+class GroupCreate(BaseModel):
+    group_name: str
+    creator: str
+
+class GroupAdd(BaseModel):
+    group_name: str
+    contact: str
+
+@app.post("/create_group")
+def create_group(req: GroupCreate):
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        # Save the group name as "#GroupName" so Flutter knows it's a group, not a person
+        formatted_name = f"#{req.group_name}" 
+        cursor.execute("INSERT INTO groups (group_name) VALUES (?)", (formatted_name,))
+        cursor.execute("INSERT INTO group_members (group_name, username) VALUES (?, ?)", (formatted_name, req.creator))
+        
+        # Add the group to the creator's contact list so it shows up on their home screen!
+        cursor.execute("INSERT INTO contacts (owner, contact) VALUES (?, ?)", (req.creator, formatted_name))
+        conn.commit()
+        return {"message": f"Group {formatted_name} created!"}
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=400, detail="Group name already exists")
+    finally:
+        conn.close()
+
+@app.post("/add_to_group")
+def add_to_group(req: GroupAdd):
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        # Check if user exists
+        cursor.execute("SELECT * FROM users WHERE username=?", (req.contact,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="User not found.")
+            
+        cursor.execute("INSERT INTO group_members (group_name, username) VALUES (?, ?)", (req.group_name, req.contact))
+        cursor.execute("INSERT INTO contacts (owner, contact) VALUES (?, ?)", (req.contact, req.group_name))
+        conn.commit()
+        return {"message": f"{req.contact} added to {req.group_name}!"}
+    except sqlite3.IntegrityError:
+         raise HTTPException(status_code=400, detail="User is already in the group.")
+    finally:
+        conn.close()
+class GroupExit(BaseModel):
+    group_name: str
+    username: str
+
+@app.get("/group_members/{group_name}")
+def get_group_members(group_name: str):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT username FROM group_members WHERE group_name=?", (group_name,))
+    rows = cursor.fetchall()
+    conn.close()
+    return [row["username"] for row in rows]
+
+@app.post("/exit_group")
+def exit_group(req: GroupExit):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM group_members WHERE group_name=? AND username=?", (req.group_name, req.username))
+    cursor.execute("DELETE FROM contacts WHERE owner=? AND contact=?", (req.username, req.group_name))
+    conn.commit()
+    conn.close()
+    return {"message": "Group exited"}

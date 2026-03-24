@@ -39,14 +39,30 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() => message = "Access Granted ✅");
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('loggedInUser', usernameController.text);
+
+        // --- NEW LOGIC: Check if they have an MPIN ---
+        final existingMpin = prefs.getString('mpin_${usernameController.text}');
+
         Future.delayed(const Duration(milliseconds: 500), () {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>
-                  ChatListScreen(currentUser: usernameController.text),
-            ),
-          );
+          if (existingMpin == null) {
+            // No MPIN? Send them to Setup!
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) =>
+                    MpinSetupScreen(username: usernameController.text),
+              ),
+            );
+          } else {
+            // Already have an MPIN? Go straight to Chats!
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) =>
+                    ChatListScreen(currentUser: usernameController.text),
+              ),
+            );
+          }
         });
       } else {
         setState(() => message = data["error"] ?? "Invalid Credentials ❌");
